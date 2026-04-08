@@ -201,6 +201,10 @@ function InlineError({ message, onRetry }: InlineErrorProps) {
 }
 
 // ── Main ChatArea component ───────────────────────────────────────
+
+// Keeps the last message visible above the fixed-position chat input bar
+const CHAT_INPUT_CLEARANCE = 220 // px
+
 interface ChatAreaProps {
   conversationId?: string
 }
@@ -358,7 +362,7 @@ export function ChatArea({ conversationId }: ChatAreaProps) {
           display: 'flex',
           flexDirection: 'column',
           padding: '24px 0 0',
-          paddingBottom: 220,
+          paddingBottom: CHAT_INPUT_CLEARANCE,
         }}
       >
         {showEmpty && <EmptyState onStarterClick={handleStarterClick} />}
