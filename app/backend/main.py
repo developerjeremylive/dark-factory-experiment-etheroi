@@ -44,11 +44,12 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routes (imported here to keep main.py clean)
 # ---------------------------------------------------------------------------
-from backend.routes import conversations, ingest, messages  # noqa: E402
+from backend.routes import conversations, ingest, messages, version  # noqa: E402
 
 app.include_router(conversations.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
+app.include_router(version.router, prefix="/api")
 
 
 # ---------------------------------------------------------------------------
