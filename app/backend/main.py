@@ -71,6 +71,13 @@ async def health():
     }
 
 
+@app.get("/api/version")
+async def version():
+    from importlib.metadata import version as get_version
+
+    return {"version": get_version("dynachat-backend")}
+
+
 # ---------------------------------------------------------------------------
 # Sprint 2 SSE test route — verifies streaming format without full RAG
 # ---------------------------------------------------------------------------
