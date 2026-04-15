@@ -121,13 +121,15 @@ def _cosine_similarity_batch(
         return np.zeros(len(matrix), dtype=np.float32)
 
     # Normalize the query once
-    query_normalized = query / query_norm
+    query_normalized: np.ndarray = query / query_norm
 
     # Compute row norms for the matrix
-    matrix_norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    matrix_norms: np.ndarray = np.linalg.norm(matrix, axis=1, keepdims=True)
     # Avoid division by zero by clamping norms
-    matrix_norms = np.where(matrix_norms == 0, 1.0, matrix_norms)
-    matrix_normalized = matrix / matrix_norms
+    matrix_norms = np.where(matrix_norms == 0, np.float32(1.0), matrix_norms)
+    matrix_normalized: np.ndarray = matrix / matrix_norms
 
     # Dot product of normalized vectors = cosine similarity
-    return (matrix_normalized @ query_normalized).astype(np.float32)  # shape: (N,)
+    # Cast through np.asarray to satisfy mypy's ndarray return type inference
+    scores: np.ndarray = np.dot(matrix_normalized, query_normalized).astype(np.float32)
+    return scores  # shape: (N,)

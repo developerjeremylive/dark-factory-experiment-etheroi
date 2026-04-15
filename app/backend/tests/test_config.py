@@ -21,11 +21,15 @@ def test_custom_single_origin():
 
 def test_custom_multiple_origins():
     """Custom CORS_ORIGINS env var with multiple origins parses correctly."""
-    result = [o.strip() for o in "http://localhost:9999,http://127.0.0.1:9999".split(",") if o.strip()]
+    result = [
+        o.strip() for o in "http://localhost:9999,http://127.0.0.1:9999".split(",") if o.strip()
+    ]
     assert result == ["http://localhost:9999", "http://127.0.0.1:9999"]
 
 
 def test_whitespace_ignored():
     """Whitespace around origins is stripped."""
-    result = [o.strip() for o in "http://localhost:9999 ,  http://127.0.0.1:9999 ".split(",") if o.strip()]
+    result = [
+        o.strip() for o in "http://localhost:9999 ,  http://127.0.0.1:9999 ".split(",") if o.strip()
+    ]
     assert result == ["http://localhost:9999", "http://127.0.0.1:9999"]
