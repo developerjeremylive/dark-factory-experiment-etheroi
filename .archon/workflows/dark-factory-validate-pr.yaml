@@ -166,18 +166,38 @@ nodes:
       #   fatal: branch 'X' is already used by worktree at '...'
       # So we proactively discover any other worktree holding this PR's
       # branch and force-remove it. Idempotent: no-op on a clean repo.
+      #
+      # Self-skip: if the CURRENT worktree happens to hold the PR branch
+      # already (e.g., a prior dispatch on the same `--branch` name reused
+      # this worktree directory), we must NOT try to remove ourselves —
+      # that corrupts our own .git pointer mid-run.
+      #
+      # We compare against `git rev-parse --show-toplevel` rather than
+      # `$(pwd)` because on Windows Git Bash, `$(pwd)` can return a path
+      # with different casing / separator normalization than what
+      # `git worktree list --porcelain` emits, causing the self-skip
+      # guard to fail silently. `git rev-parse --show-toplevel` emits
+      # the git-canonical path in the same format the porcelain listing
+      # uses, so string equality is reliable.
       PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName -q '.headRefName')
       if [ -n "$PR_BRANCH" ]; then
         echo "Checking for stale worktrees holding branch '$PR_BRANCH'..."
         git worktree prune
+        CURRENT_WT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+        echo "Current worktree (canonical): $CURRENT_WT"
         git worktree list --porcelain | awk -v b="$PR_BRANCH" '
           /^worktree / {w=$2}
           $0 == "branch refs/heads/" b {print w}
         ' | while read -r stale_wt; do
-          if [ -n "$stale_wt" ] && [ "$stale_wt" != "$(pwd)" ]; then
-            echo "Removing stale worktree: $stale_wt"
-            git worktree remove --force "$stale_wt" 2>&1 || true
+          if [ -z "$stale_wt" ]; then
+            continue
           fi
+          if [ "$stale_wt" = "$CURRENT_WT" ]; then
+            echo "Skipping self (current worktree holds PR branch): $stale_wt"
+            continue
+          fi
+          echo "Removing stale worktree: $stale_wt"
+          git worktree remove --force "$stale_wt" 2>&1 || true
         done
         git worktree prune
       fi
@@ -878,6 +898,33 @@ nodes:
       else
         VERDICT_FILE="$ARTIFACTS_DIR/p1-verdict.json"
         PASS_LABEL="pass-1"
+      fi
+
+      # Defensive: if the selected verdict file is empty or unparseable,
+      # an upstream node (checkout-pr, start-app, synthesize-verdict-*)
+      # failed and its $node.output substitution resolved to nothing. The
+      # downstream jq / case logic assumes a well-formed object, so without
+      # this guard apply-verdict hits secondary parse errors and the broken
+      # run leaves the PR in a stuck state. Write a hardcoded fallback
+      # verdict that routes to the reject+escalate branch — this leaves
+      # the PR OPEN with factory:needs-human so a human can investigate
+      # the underlying validator failure.
+      if [ ! -s "$VERDICT_FILE" ] || ! jq -e '.verdict' "$VERDICT_FILE" > /dev/null 2>&1; then
+        echo "WARN: verdict file ($VERDICT_FILE) is empty or unparseable — emitting fallback reject+escalate" >&2
+        cat > "$VERDICT_FILE" <<'__FALLBACK_VERDICT_EOF__'
+      {
+        "verdict": "reject",
+        "summary": "Validator infrastructure failed — no synthesizer output available. Manual investigation required.",
+        "static_checks_status": "fail",
+        "tests_status": "fail",
+        "behavioral_status": "no",
+        "security_status": "fail",
+        "issues_to_fix": [],
+        "should_escalate": true,
+        "escalation_reason": "Upstream node (checkout-pr, start-app, or synthesize-verdict) failed and produced no verdict. Validator cannot render a substantive decision; human must investigate the broken run.",
+        "reasoning": "Fallback verdict emitted by apply-verdict because the selected verdict file was empty or unparseable JSON. This indicates an upstream infrastructure failure, not a defect in the PR under review."
+      }
+      __FALLBACK_VERDICT_EOF__
       fi
 
       cp "$VERDICT_FILE" "$ARTIFACTS_DIR/verdict.json"
