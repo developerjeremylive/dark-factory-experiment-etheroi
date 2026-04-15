@@ -156,8 +156,8 @@ nodes:
       # Merge latest main into the PR branch so the worktree has up-to-date
       # workflow infra (.archon/commands, .claude/skills) regardless of how
       # stale the PR is. Governance was already fetched from origin/main into
-      # $fetch-base-governance.output BEFORE this checkout, so the holdout
-      # property is preserved (validators only read the captured snapshot).
+      # the fetch-base-governance artifact BEFORE this checkout, so the
+      # holdout property is preserved (validators only read that snapshot).
       # If the merge conflicts, abort and fail fast — a conflicted PR can't
       # be validated cleanly anyway.
       git config user.email "dark-factory@local"
