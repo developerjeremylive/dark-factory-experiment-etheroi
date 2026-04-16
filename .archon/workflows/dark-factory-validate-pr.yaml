@@ -903,17 +903,7 @@ nodes:
       #    "mypy's") and produce invalid JSON escape sequences (\').
       # Python handles both reliably; sed escaping is fragile in YAML.
       for vf in "$ARTIFACTS_DIR/p1-verdict.json" "$ARTIFACTS_DIR/p2-verdict.json"; do
-        [ -f "$vf" ] && python3 -c "
-import sys, pathlib
-p = pathlib.Path(sys.argv[1])
-t = p.read_text()
-if t.startswith(chr(39)):
-    t = t[1:]
-if t.endswith(chr(39)):
-    t = t[:-1]
-t = t.replace(chr(39)+chr(92)+chr(39)+chr(39), chr(39))
-p.write_text(t)
-" "$vf"
+        [ -f "$vf" ] && python3 -c "import sys,pathlib;p=pathlib.Path(sys.argv[1]);t=p.read_text();t=t.strip(chr(39));t=t.replace(chr(39)+chr(92)+chr(39)+chr(39),chr(39));p.write_text(t)" "$vf"
       done
 
       # Pick the authoritative verdict. If pass-2 ran (i.e., fix happened),
