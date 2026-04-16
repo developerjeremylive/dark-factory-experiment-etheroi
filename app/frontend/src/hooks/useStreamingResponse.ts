@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 export interface StreamResult {
   fullText: string;
@@ -9,6 +9,7 @@ export function useStreamingResponse() {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [streamingSources, setStreamingSources] = useState<string[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const startStream = useCallback(
     async (
@@ -20,6 +21,9 @@ export function useStreamingResponse() {
       setStreamingContent('');
       setStreamingSources([]);
 
+      // Set up AbortController for mid-stream cancellation
+      abortControllerRef.current = new AbortController();
+
       let fullText = '';
       let sources: string[] = [];
 
@@ -28,6 +32,7 @@ export function useStreamingResponse() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: userMessage }),
+          signal: abortControllerRef.current.signal,
         });
 
         if (!res.ok) {
@@ -111,9 +116,18 @@ export function useStreamingResponse() {
 
         // Stream completed successfully
         onComplete({ fullText, sources });
+      } catch (e) {
+        // Handle AbortError (mid-stream cancellation via cancel())
+        if (e instanceof Error && e.name === 'AbortError') {
+          // Stream was cancelled — clean up state silently
+          return;
+        }
+        // Re-throw other errors so ChatArea catch block can handle them
+        throw e;
       } finally {
         // Always reset streaming state — React 18 batches this with the onComplete
         // state updates, ensuring a seamless transition to the persisted message.
+        abortControllerRef.current = null;
         setIsStreaming(false);
         setStreamingContent('');
         setStreamingSources([]);
@@ -122,5 +136,12 @@ export function useStreamingResponse() {
     [],
   );
 
-  return { streamingContent, streamingSources, isStreaming, startStream };
+  // Cancel any in-flight stream (e.g., on conversation switch or component unmount)
+  const cancelStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  return { streamingContent, streamingSources, isStreaming, startStream, cancelStream };
 }
