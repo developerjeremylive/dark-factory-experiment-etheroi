@@ -111,7 +111,12 @@ export function VideoExplorer({ isOpen, onClose }: VideoExplorerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ingestOpen, setIngestOpen] = useState(false);
-  const [ingestForm, setIngestForm] = useState({ title: '', description: '', url: '', transcript: '' });
+  const [ingestForm, setIngestForm] = useState({
+    title: '',
+    description: '',
+    url: '',
+    transcript: '',
+  });
   const [ingesting, setIngesting] = useState(false);
   const [ingestError, setIngestError] = useState<string | null>(null);
 
@@ -380,28 +385,69 @@ export function VideoExplorer({ isOpen, onClose }: VideoExplorerProps) {
                 maxWidth: 'calc(100vw - 48px)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 600, margin: 0 }}>Add New Video</h3>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <h3 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 600, margin: 0 }}>
+                  Add New Video
+                </h3>
                 <button
-                  onClick={() => { setIngestOpen(false); setIngestError(null); }}
-                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18 }}
+                  onClick={() => {
+                    setIngestOpen(false);
+                    setIngestError(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    fontSize: 18,
+                  }}
                 >
                   ×
                 </button>
               </div>
               {ingestError && (
-                <div style={{ color: '#f87171', marginBottom: 12, fontSize: 13 }}>{ingestError}</div>
+                <div style={{ color: '#f87171', marginBottom: 12, fontSize: 13 }}>
+                  {ingestError}
+                </div>
               )}
               {[
                 { key: 'title', label: 'Title', placeholder: 'Video title', type: 'text' },
-                { key: 'description', label: 'Description', placeholder: 'Short description', type: 'text' },
-                { key: 'url', label: 'YouTube URL', placeholder: 'https://www.youtube.com/watch?v=...', type: 'url' },
-                { key: 'transcript', label: 'Transcript', placeholder: 'Full transcript text...', type: 'textarea' },
+                {
+                  key: 'description',
+                  label: 'Description',
+                  placeholder: 'Short description',
+                  type: 'text',
+                },
+                {
+                  key: 'url',
+                  label: 'YouTube URL',
+                  placeholder: 'https://www.youtube.com/watch?v=...',
+                  type: 'url',
+                },
+                {
+                  key: 'transcript',
+                  label: 'Transcript',
+                  placeholder: 'Full transcript text...',
+                  type: 'textarea',
+                },
               ].map(({ key, label, placeholder, type }) => (
                 <div key={key} style={{ marginBottom: 12 }}>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: 12, marginBottom: 4 }}>{label}</label>
+                  <label
+                    htmlFor={key}
+                    style={{ display: 'block', color: '#94a3b8', fontSize: 12, marginBottom: 4 }}
+                  >
+                    {label}
+                  </label>
                   {type === 'textarea' ? (
                     <textarea
+                      id={key}
                       value={ingestForm[key as keyof typeof ingestForm]}
                       onChange={(e) => setIngestForm({ ...ingestForm, [key]: e.target.value })}
                       placeholder={placeholder}
@@ -420,6 +466,7 @@ export function VideoExplorer({ isOpen, onClose }: VideoExplorerProps) {
                     />
                   ) : (
                     <input
+                      id={key}
                       type={type}
                       value={ingestForm[key as keyof typeof ingestForm]}
                       onChange={(e) => setIngestForm({ ...ingestForm, [key]: e.target.value })}
@@ -440,7 +487,10 @@ export function VideoExplorer({ isOpen, onClose }: VideoExplorerProps) {
               ))}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
                 <button
-                  onClick={() => { setIngestOpen(false); setIngestError(null); }}
+                  onClick={() => {
+                    setIngestOpen(false);
+                    setIngestError(null);
+                  }}
                   style={{
                     padding: '8px 16px',
                     background: 'transparent',
