@@ -59,6 +59,14 @@ async def get_video(video_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+async def delete_video(video_id: str) -> None:
+    """Delete a video and all its associated chunks (FK cascade handles chunks)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA foreign_keys=ON;")
+        await db.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+        await db.commit()
+
+
 async def list_videos() -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -89,14 +97,17 @@ async def create_chunk(
     content: str,
     embedding: list[float],
     chunk_index: int,
+    start_seconds: float = 0.0,
+    end_seconds: float = 0.0,
+    snippet: str = "",
 ) -> dict:
     chunk_id = _new_id()
     embedding_json = json.dumps(embedding)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO chunks (id, video_id, content, embedding, chunk_index) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (chunk_id, video_id, content, embedding_json, chunk_index),
+            "INSERT INTO chunks (id, video_id, content, embedding, chunk_index, start_seconds, end_seconds, snippet) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (chunk_id, video_id, content, embedding_json, chunk_index, start_seconds, end_seconds, snippet),
         )
         await db.commit()
     return {
@@ -105,6 +116,9 @@ async def create_chunk(
         "content": content,
         "embedding": embedding,
         "chunk_index": chunk_index,
+        "start_seconds": start_seconds,
+        "end_seconds": end_seconds,
+        "snippet": snippet,
     }
 
 
@@ -113,7 +127,7 @@ async def list_chunks() -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, video_id, content, embedding, chunk_index FROM chunks"
+            "SELECT id, video_id, content, embedding, chunk_index, start_seconds, end_seconds, snippet FROM chunks"
         ) as cursor:
             rows = await cursor.fetchall()
     result = []
@@ -128,7 +142,7 @@ async def list_chunks_for_video(video_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, video_id, content, embedding, chunk_index FROM chunks "
+            "SELECT id, video_id, content, embedding, chunk_index, start_seconds, end_seconds, snippet FROM chunks "
             "WHERE video_id = ? ORDER BY chunk_index",
             (video_id,),
         ) as cursor:
@@ -195,14 +209,17 @@ async def replace_chunks_for_video(
         await db.execute("DELETE FROM chunks WHERE video_id = ?", (video_id,))
         for c in chunks:
             await db.execute(
-                "INSERT INTO chunks (id, video_id, content, embedding, chunk_index) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO chunks (id, video_id, content, embedding, chunk_index, start_seconds, end_seconds, snippet) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     _new_id(),
                     video_id,
                     c["content"],
                     json.dumps(c["embedding"]),
                     c["chunk_index"],
+                    c.get("start_seconds", 0.0),
+                    c.get("end_seconds", 0.0),
+                    c.get("snippet", ""),
                 ),
             )
         await db.commit()
