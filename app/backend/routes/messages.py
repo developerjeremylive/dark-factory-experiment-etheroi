@@ -29,7 +29,6 @@ from backend.auth.dependencies import get_current_user
 from backend.db import repository
 from backend.llm.openrouter import stream_chat
 from backend.rag.embeddings import embed_text
-from backend.rag.retriever import retrieve
 from backend.rag.retriever_hybrid import retrieve_hybrid
 
 logger = logging.getLogger(__name__)
@@ -114,6 +113,7 @@ async def create_message(
     # 5. Embed the user query and retrieve relevant chunks
     context = ""
     chunks: list[dict] = []
+    retrieval_failed = False
     try:
         query_embedding = await asyncio.to_thread(embed_text, user_content)
         chunks = await retrieve_hybrid(user_content, query_embedding, top_k=5)
@@ -121,6 +121,7 @@ async def create_message(
             context = _format_context(chunks)
     except Exception as exc:
         logger.warning("RAG retrieval failed (continuing without context): %s", exc)
+        retrieval_failed = True
 
     # Build citation objects for the SSE sources event
     source_citations: list[dict] = [
@@ -136,6 +137,11 @@ async def create_message(
         for c in chunks
         if c.get("chunk_id")
     ]
+
+    # Attach retrieval status to citations so frontend can warn user
+    if retrieval_failed:
+        for citation in source_citations:
+            citation["retrieval_failed"] = True
 
     # 6. Stream the response
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -163,6 +169,7 @@ async def create_message(
                     await _maybe_set_conversation_title(conv_id, user_id, user_content)
                 except Exception as exc:
                     logger.error("Failed to persist assistant message: %s", exc)
+                    raise  # Re-raise to surface the error to FastAPI
 
     return StreamingResponse(
         event_generator(),

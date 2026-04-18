@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any
 
 from backend.config import HYBRID_K_CONSTANT, HYBRID_OVERFETCH_FACTOR, KEYWORD_LANGUAGE
 from backend.db import repository

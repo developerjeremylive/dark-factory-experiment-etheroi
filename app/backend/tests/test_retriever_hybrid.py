@@ -117,6 +117,10 @@ class TestRetrieveHybrid:
 
     async def test_calls_keyword_and_vector_search(self):
         """retrieve_hybrid calls both keyword_search and vector_search_pg."""
+        from backend.config import HYBRID_OVERFETCH_FACTOR
+
+        fetch_k = 5 * HYBRID_OVERFETCH_FACTOR
+
         with (
             patch(
                 "backend.rag.retriever_hybrid.repository.keyword_search",
@@ -140,10 +144,23 @@ class TestRetrieveHybrid:
 
             result = await retrieve_hybrid("test query", [0.1] * 1536, top_k=5)
 
+            # Verify both search functions were called
             assert mock_kw.called
             assert mock_vec.called
-            # RRF merges both result sets
+
+            # Verify correct arguments passed (over-fetch factor applied)
+            mock_kw.assert_called_once_with("test query", top_k=fetch_k, language="english")
+            mock_vec.assert_called_once_with([0.1] * 1536, top_k=fetch_k)
+
+            # Verify result shape has all required citation fields
             assert len(result) >= 1
+            for item in result:
+                assert "chunk_id" in item
+                assert "video_title" in item
+                assert "video_url" in item
+                assert "start_seconds" in item
+                assert "end_seconds" in item
+                assert "snippet" in item
 
     async def test_rare_exact_term_boosted_by_keyword_path(self):
         """A technical acronym (weak in cosine space) ranks higher via hybrid.
