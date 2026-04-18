@@ -89,7 +89,7 @@ async def get_channel_video_ids(
             logger.error("Network error in get_channel_video_ids: %s", exc)
             raise SupadataError(error="network_error", message=str(exc), details="") from exc
 
-    raise RuntimeError("unreachable")
+    raise RuntimeError("unreachable")  # mypy needs this for return-type inference
 
 
 async def get_transcript(video_id: str, lang: str = "en") -> str | None:
@@ -110,13 +110,12 @@ async def get_transcript(video_id: str, lang: str = "en") -> str | None:
 
     for attempt in range(3):
         try:
-            result = client.youtube.transcript(video_id=video_id, lang=lang)
+            result = client.transcript(url=f"https://youtube.com/watch?v={video_id}", lang=lang)
             if not result:
                 return None
-            # Supadata SDK ≥1.x returns a `content` field instead of `text`.
-            # `content` is either a plain string (when the caller asked for
-            # text mode) or a list of TranscriptChunk(text, offset, duration,
-            # lang) segments. Normalize to a single string.
+            # `content` is either a plain string (text mode) or a list of
+            # TranscriptChunk(text, offset, duration, lang) segments.
+            # Normalize to a single string.
             content = getattr(result, "content", None)
             if content is None:
                 return None
