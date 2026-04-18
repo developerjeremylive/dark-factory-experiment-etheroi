@@ -92,6 +92,11 @@ export const getConversation = (id: string) =>
   request<ConversationWithMessages>(`/conversations/${id}`);
 export const deleteConversation = (id: string) =>
   fetch(`${BASE}/conversations/${id}`, { method: 'DELETE', credentials: 'include' });
+export const renameConversation = (id: string, title: string) =>
+  request<Conversation>(`/conversations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  });
 
 // Videos
 export const getVideos = () => request<Video[]>('/videos');
