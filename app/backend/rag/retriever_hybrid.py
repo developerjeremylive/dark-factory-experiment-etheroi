@@ -157,27 +157,16 @@ def _rrf_merge(
     scores: dict[str, float] = defaultdict(float)
     rows: dict[str, dict] = {}
 
-    # Keyword rank contributions
     for rank, row in enumerate(keyword_hits):
         chunk_id = row["id"]
         scores[chunk_id] += 1.0 / (k + rank)
         rows[chunk_id] = row
 
-    # Vector rank contributions
     for rank, row in enumerate(vector_hits):
         chunk_id = row["id"]
         scores[chunk_id] += 1.0 / (k + rank)
         if chunk_id not in rows:
             rows[chunk_id] = row
 
-    # Sort by RRF score descending
-    ranked = sorted(scores.items(), key=lambda x: -x[1])[:top_k]
-
-    # Attach rrf_score to each row and return in rank order
-    merged: list[dict] = []
-    for chunk_id, rrf_score in ranked:
-        row = dict(rows[chunk_id])  # copy to avoid mutating cached dicts
-        row["rrf_score"] = rrf_score
-        merged.append(row)
-
-    return merged
+    ranked = sorted(scores, key=scores.__getitem__, reverse=True)[:top_k]
+    return [{**rows[cid], "rrf_score": scores[cid]} for cid in ranked]
