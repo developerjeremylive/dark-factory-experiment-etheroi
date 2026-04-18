@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from supadata import Supadata, SupadataError
 
@@ -78,7 +78,9 @@ async def get_channel_video_ids(
         except SupadataError as exc:
             if exc.status == 429 and attempt < 2:
                 delay = 2.0 * (2**attempt)
-                logger.warning("Supadata rate limit (429), retrying in %ds (attempt %d)", delay, attempt + 1)
+                logger.warning(
+                    "Supadata rate limit (429), retrying in %ds (attempt %d)", delay, attempt + 1
+                )
                 await asyncio.sleep(delay)
                 continue
             logger.error("Supadata channel.videos failed after %d attempts: %s", 3, exc)

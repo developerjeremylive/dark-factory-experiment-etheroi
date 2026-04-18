@@ -15,7 +15,6 @@ import pytest
 
 from backend.rag.retriever_hybrid import _rrf_merge, retrieve_hybrid
 
-
 # Minimal chunk fixtures for RRF testing
 _CHUNK_A = {
     "id": "c1",

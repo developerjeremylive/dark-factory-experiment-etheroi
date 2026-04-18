@@ -76,9 +76,7 @@ async def retrieve_hybrid(
     fetch_k = top_k * HYBRID_OVERFETCH_FACTOR
 
     # Run keyword and vector searches concurrently
-    keyword_task = repository.keyword_search(
-        query_text, top_k=fetch_k, language=KEYWORD_LANGUAGE
-    )
+    keyword_task = repository.keyword_search(query_text, top_k=fetch_k, language=KEYWORD_LANGUAGE)
     vector_task = repository.vector_search_pg(query_embedding, top_k=fetch_k)
 
     keyword_hits, vector_hits = await keyword_task, await vector_task
