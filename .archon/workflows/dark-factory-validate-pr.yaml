@@ -273,8 +273,21 @@ nodes:
       echo ""
       echo "=== Frontend deps (bun install) ==="
       (cd app/frontend && bun install 2>&1 | tail -10)
+      echo ""
+      # Warm the mypy cache. Cold mypy on this backend exceeds the 2-min
+      # bash-node default timeout and SIGTERMs static-checks-backend-p1;
+      # a warm .mypy_cache/ lets the next mypy run complete in seconds.
+      # All DAG nodes in a run share this worktree, so the cache we populate
+      # here is the cache static-checks-backend-p1 (and -p2) will hit.
+      # Type errors are non-fatal here — the cache populates regardless,
+      # and the real verdict comes from the dedicated static-checks nodes.
+      echo "=== Warming mypy cache ==="
+      (cd app/backend && uv run mypy . 2>&1 | tail -3) || true
     depends_on: [checkout-pr]
-    idle_timeout: 300000
+    # Bash nodes ignore idle_timeout — only `timeout` is honored (default
+    # 120000ms). Must set explicitly: uv sync + bun install + cold mypy
+    # together can run 3-5 minutes on a fresh worktree.
+    timeout: 600000
 
   - id: start-app
     bash: |
@@ -405,22 +418,28 @@ nodes:
       set +e
       export PATH="$HOME/.local/bin:$PATH"
       cd app/backend
+      # ${PIPESTATUS[0]} captures the real command's exit, not `tail`'s.
+      # Plain $? after a pipe reads tail's exit (always 0), silently
+      # masking ruff/mypy failures.
       echo "=== ruff check ==="
       uv run ruff check . 2>&1 | tail -30
-      RUFF_LINT=$?
+      RUFF_LINT=${PIPESTATUS[0]}
       echo ""
       echo "=== ruff format --check ==="
       uv run ruff format --check . 2>&1 | tail -30
-      RUFF_FMT=$?
+      RUFF_FMT=${PIPESTATUS[0]}
       echo ""
       echo "=== mypy ==="
       uv run mypy . 2>&1 | tail -30
-      MYPY=$?
+      MYPY=${PIPESTATUS[0]}
       echo ""
       echo "RESULT: ruff-lint=$([ $RUFF_LINT -eq 0 ] && echo PASS || echo FAIL) ruff-fmt=$([ $RUFF_FMT -eq 0 ] && echo PASS || echo FAIL) mypy=$([ $MYPY -eq 0 ] && echo PASS || echo FAIL)"
       [ $RUFF_LINT -eq 0 ] && [ $RUFF_FMT -eq 0 ] && [ $MYPY -eq 0 ]
     depends_on: [install-deps]
-    idle_timeout: 180000
+    # Bash nodes honor `timeout`, not `idle_timeout`. Even with a warm
+    # .mypy_cache from install-deps, ruff + mypy on a fresh worktree
+    # occasionally runs >2 minutes — give it real headroom.
+    timeout: 300000
 
   - id: static-checks-frontend-p1
     bash: |
@@ -682,19 +701,26 @@ nodes:
       set +e
       export PATH="$HOME/.local/bin:$PATH"
       cd app/backend
+      # ${PIPESTATUS[0]} captures the real command's exit, not `tail`'s.
+      # Plain $? after a pipe reads tail's exit (always 0), silently
+      # masking ruff/mypy failures.
       echo "=== ruff check ==="
-      uv run ruff check . 2>&1 | tail -30; RUFF_LINT=$?
+      uv run ruff check . 2>&1 | tail -30; RUFF_LINT=${PIPESTATUS[0]}
       echo ""
       echo "=== ruff format --check ==="
-      uv run ruff format --check . 2>&1 | tail -30; RUFF_FMT=$?
+      uv run ruff format --check . 2>&1 | tail -30; RUFF_FMT=${PIPESTATUS[0]}
       echo ""
       echo "=== mypy ==="
-      uv run mypy . 2>&1 | tail -30; MYPY=$?
+      uv run mypy . 2>&1 | tail -30; MYPY=${PIPESTATUS[0]}
       echo ""
       echo "RESULT: ruff-lint=$([ $RUFF_LINT -eq 0 ] && echo PASS || echo FAIL) ruff-fmt=$([ $RUFF_FMT -eq 0 ] && echo PASS || echo FAIL) mypy=$([ $MYPY -eq 0 ] && echo PASS || echo FAIL)"
       [ $RUFF_LINT -eq 0 ] && [ $RUFF_FMT -eq 0 ] && [ $MYPY -eq 0 ]
     depends_on: [fix-issues]
-    idle_timeout: 180000
+    # Bash nodes honor `timeout`, not `idle_timeout`. The mypy cache from
+    # install-deps is already warm; p2 runs after fix-issues pushed code,
+    # so most changed modules need re-checking but most of the tree is
+    # cached. 5 min is generous headroom.
+    timeout: 300000
 
   - id: static-checks-frontend-p2
     bash: |
