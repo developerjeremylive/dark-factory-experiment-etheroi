@@ -1,9 +1,9 @@
 """
-Ingest package — Supadata client and URL utilities for the /ingest/from-url endpoint.
+Ingest package — YouTube URL utilities.
 
-Modules:
-  supadata_client: async HTTP client for the Supadata transcript API
-  youtube_url: YouTube URL parsing and validation
+The Supadata transcript client lives in `backend.services.video_ingest` as a
+unified helper that wraps the official Supadata SDK and YouTube oEmbed title
+lookup. This package now only hosts URL parsing.
 """
 
 from __future__ import annotations

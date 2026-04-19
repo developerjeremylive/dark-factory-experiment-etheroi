@@ -267,8 +267,9 @@ async def test_delete_non_admin_returns_403(client):
 
 
 async def test_resync_preserves_chunks_on_supadata_failure(client):
+    from supadata import SupadataError
+
     from backend.db import repository
-    from backend.ingest.supadata_client import SupadataError
 
     video = await repository.create_video(
         title="Original",
@@ -286,8 +287,12 @@ async def test_resync_preserves_chunks_on_supadata_failure(client):
     await _signup(client, ADMIN_EMAIL)
 
     with patch(
-        "backend.routes.admin.SupadataClient.fetch_transcript",
-        new=AsyncMock(side_effect=SupadataError("rate-limited")),
+        "backend.routes.admin.fetch_video_for_ingest",
+        new=AsyncMock(
+            side_effect=SupadataError(
+                error="rate_limited", message="rate-limited", details=""
+            )
+        ),
     ):
         r = await client.post(f"/api/admin/videos/{video['id']}/re-sync")
 
@@ -316,13 +321,15 @@ async def test_resync_replaces_chunks_on_success(client):
             "title": "New Title",
             "description": "New Desc",
             "transcript": "brand new transcript content",
+            "youtube_video_id": "dQw4w9WgXcQ",
+            "segments": [],
         }
     )
 
     # Stub the chunker + embedder so we don't need the real ONNX model.
     with (
         patch(
-            "backend.routes.admin.SupadataClient.fetch_transcript",
+            "backend.routes.admin.fetch_video_for_ingest",
             new=fake_supadata,
         ),
         patch(
@@ -363,6 +370,8 @@ async def test_add_video_by_url_succeeds(client):
             "title": "New Video",
             "description": "New Desc",
             "transcript": "transcript text",
+            "youtube_video_id": "abc12345678",
+            "segments": [],
         }
     )
 
@@ -370,7 +379,7 @@ async def test_add_video_by_url_succeeds(client):
 
     with (
         patch(
-            "backend.routes.admin.SupadataClient.fetch_transcript",
+            "backend.routes.admin.fetch_video_for_ingest",
             new=fake_supadata,
         ),
         patch("backend.routes.admin.chunk_video", return_value=["c0", "c1"]),
@@ -404,13 +413,21 @@ async def test_add_video_rejects_duplicate(client):
         transcript="t",
     )
 
-    fake_supadata = AsyncMock(return_value={"title": "T", "description": "D", "transcript": "tx"})
+    fake_supadata = AsyncMock(
+        return_value={
+            "title": "T",
+            "description": "D",
+            "transcript": "tx",
+            "youtube_video_id": "abc12345678",
+            "segments": [],
+        }
+    )
 
     await _signup(client, ADMIN_EMAIL)
 
     with (
         patch(
-            "backend.routes.admin.SupadataClient.fetch_transcript",
+            "backend.routes.admin.fetch_video_for_ingest",
             new=fake_supadata,
         ),
         patch("backend.routes.admin.chunk_video", return_value=["c0"]),

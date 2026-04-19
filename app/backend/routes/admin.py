@@ -22,15 +22,16 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import AnyUrl, BaseModel, Field
+from supadata import SupadataError
 
 from backend.config import SUPADATA_API_KEY, YOUTUBE_CHANNEL_ID
 from backend.db import repository as repo
-from backend.ingest.supadata_client import SupadataClient, SupadataError
 from backend.ingest.youtube_url import parse_youtube_url
 from backend.rag import retriever
 from backend.rag.chunker import chunk_video
 from backend.rag.embeddings import embed_batch
 from backend.routes.channels import sync_channel as _sync_channel_impl
+from backend.services.video_ingest import fetch_video_for_ingest
 
 logger = logging.getLogger(__name__)
 
@@ -80,22 +81,20 @@ class AdminVideosResponse(BaseModel):
 async def _fetch_chunks_and_embeddings(url_str: str) -> tuple[dict, list[dict]]:
     """Fetch transcript via Supadata, chunk, embed. Raises HTTPException on failure."""
     try:
-        parsed = parse_youtube_url(url_str)
+        parse_youtube_url(url_str)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    client = SupadataClient()
     try:
-        supadata_data = await client.fetch_transcript(url_str, lang="en")
+        supadata_data = await fetch_video_for_ingest(url_str, lang="en")
     except SupadataError as exc:
         logger.error("Supadata fetch failed for '%s': %s", url_str, exc)
         raise HTTPException(status_code=503, detail=f"Transcript fetch failed: {exc}") from exc
-    finally:
-        await client.close()
 
     title = supadata_data["title"]
     description = supadata_data["description"]
     transcript = supadata_data["transcript"]
+    youtube_video_id = supadata_data["youtube_video_id"]
 
     chunk_texts: list[str] = chunk_video({"title": title, "transcript": transcript})
     if not chunk_texts:
@@ -125,7 +124,7 @@ async def _fetch_chunks_and_embeddings(url_str: str) -> tuple[dict, list[dict]]:
         "title": title,
         "description": description,
         "transcript": transcript,
-        "youtube_video_id": parsed.video_id,
+        "youtube_video_id": youtube_video_id,
     }
     return metadata, chunks
 

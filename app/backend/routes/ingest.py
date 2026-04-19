@@ -13,13 +13,14 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import AnyUrl, BaseModel, Field, field_validator
+from supadata import SupadataError
 
 from backend.db import repository
-from backend.ingest.supadata_client import SupadataClient, SupadataError
 from backend.ingest.youtube_url import parse_youtube_url
 from backend.rag import retriever
 from backend.rag.chunker import chunk_video, chunk_video_fallback, chunk_video_timestamped
 from backend.rag.embeddings import embed_batch
+from backend.services.video_ingest import fetch_video_for_ingest
 
 logger = logging.getLogger(__name__)
 
@@ -204,27 +205,23 @@ async def ingest_from_url(body: IngestFromUrlRequest) -> IngestFromUrlResponse:
     """
     url_str = str(body.url)
 
-    # 1. Parse and validate the YouTube URL
+    # 1. Parse + validate URL early so bad input fails with 400 before any network call.
     try:
-        parsed = parse_youtube_url(url_str)
+        parse_youtube_url(url_str)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    video_id_from_url = parsed.video_id
-    logger.info("Ingesting from URL: '%s' (video_id=%s)", url_str, video_id_from_url)
+    logger.info("Ingesting from URL: '%s'", url_str)
 
-    # 2. Fetch transcript + metadata from Supadata
-    client = SupadataClient()
+    # 2. Fetch transcript + title via the unified helper (Supadata SDK + oEmbed).
     try:
-        supadata_data = await client.fetch_transcript(url_str, lang="en")
+        supadata_data = await fetch_video_for_ingest(url_str, lang="en")
     except SupadataError as exc:
         logger.error("Supadata fetch failed for '%s': %s", url_str, exc)
         raise HTTPException(
             status_code=503,
             detail=f"Transcript fetch failed: {exc}",
         ) from exc
-    finally:
-        await client.close()
 
     title = supadata_data["title"]
     description = supadata_data["description"]
