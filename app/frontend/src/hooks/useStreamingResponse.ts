@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { type Citation, RateLimitError } from '../lib/api';
 
 export interface StreamResult {
@@ -10,6 +10,15 @@ export function useStreamingResponse() {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [streamingSources, setStreamingSources] = useState<Citation[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  const abortStream = useCallback(() => {
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+  }, []);
 
   const startStream = useCallback(
     async (
@@ -23,13 +32,18 @@ export function useStreamingResponse() {
 
       let fullText = '';
       let sources: Citation[] = [];
+      let streamError: Error | null = null;
 
       try {
+        const abortController = new AbortController();
+        streamAbortRef.current = abortController;
+
         const res = await fetch(`/api/conversations/${conversationId}/messages`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: userMessage }),
+          signal: abortController.signal,
         });
 
         if (res.status === 401) {
@@ -108,7 +122,8 @@ export function useStreamingResponse() {
               } catch {
                 // Use default message
               }
-              throw new Error(errMsg);
+              streamError = new Error(errMsg);
+              break;
             } else if (data) {
               // Tokens are JSON-encoded strings to safely handle newlines/special chars
               let token = data;
@@ -135,9 +150,10 @@ export function useStreamingResponse() {
         setStreamingContent('');
         setStreamingSources([]);
       }
+      if (streamError) throw streamError;
     },
     [],
   );
 
-  return { streamingContent, streamingSources, isStreaming, startStream };
+  return { streamingContent, streamingSources, isStreaming, startStream, abortStream };
 }
