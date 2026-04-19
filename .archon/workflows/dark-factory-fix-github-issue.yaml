@@ -265,3 +265,27 @@ nodes:
     command: archon-issue-completion-report
     depends_on: [simplify]
     context: fresh
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 11: CLEANUP ISSUE LABEL
+  # ═══════════════════════════════════════════════════════════════
+  # The orchestrator stamps `factory:in-progress` on the issue when it
+  # dispatches this workflow. Once the PR exists, the work-in-progress
+  # state lives on the PR (via factory:needs-review) and the issue's
+  # label is stale. Runs with trigger_rule: all_done so a late-stage
+  # failure (self-fix, simplify, report) can't leave the issue stuck
+  # on in-progress forever.
+  - id: cleanup-issue-label
+    bash: |
+      set -euo pipefail
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "No issue number parsed — nothing to clean up"
+        exit 0
+      fi
+      # --remove-label is idempotent (succeeds if the label isn't present)
+      gh issue edit "$ISSUE_NUM" --remove-label "factory:in-progress" 2>&1 || true
+      echo "Cleared factory:in-progress from issue #$ISSUE_NUM"
+    depends_on: [report]
+    trigger_rule: all_done
+    timeout: 15000
