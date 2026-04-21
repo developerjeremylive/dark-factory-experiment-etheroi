@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 
 from backend.auth.dependencies import get_current_admin, get_current_user
 from backend.config import CORS_ORIGINS, FRONTEND_DIST
@@ -137,27 +137,6 @@ async def version() -> dict[str, str]:
         return {"version": get_version("dynachat-backend")}
     except PackageNotFoundError:
         raise HTTPException(status_code=503, detail="Package metadata unavailable") from None
-
-
-@app.post("/api/stream-test")
-async def stream_test():
-    """
-    Test route that streams a short LLM response as SSE to verify streaming format.
-    """
-    from backend.llm.openrouter import stream_chat
-
-    async def generator():
-        async for chunk in stream_chat(
-            messages=[{"role": "user", "content": "Say hello in exactly 3 words."}],
-            context="",
-        ):
-            yield chunk
-
-    return StreamingResponse(
-        generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
 
 
 # ---------------------------------------------------------------------------
