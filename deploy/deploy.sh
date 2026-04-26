@@ -69,7 +69,7 @@ swap_caddy_upstream() {
     sleep 1
     local live
     live=$(docker exec dynachat-caddy wget -qO- --timeout=3 \
-        http://localhost:2019/config/ 2>/dev/null || echo "")
+        http://127.0.0.1:2019/config/ 2>/dev/null || echo "")
     if echo "$live" | grep -q "$expected"; then
         echo "[$(date -Iseconds)] caddy reload verified — routing to $expected"
         return 0
@@ -81,7 +81,7 @@ swap_caddy_upstream() {
     # itself is broken the next deploy attempt or a human will catch it.
     for i in $(seq 1 15); do
         if docker exec dynachat-caddy wget -qO- --timeout=2 \
-            http://localhost:2019/config/ 2>/dev/null | grep -q "$expected"; then
+            http://127.0.0.1:2019/config/ 2>/dev/null | grep -q "$expected"; then
             echo "[$(date -Iseconds)] caddy restart verified — routing to $expected"
             return 0
         fi
