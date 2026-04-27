@@ -69,6 +69,15 @@ async def test_unknown_tool_name_returns_error() -> None:
 # --- Search executors (happy paths, dependencies mocked) -------------------
 
 
+# Shape returned by execute_search_hybrid after the full pipeline runs:
+# retrieve_hybrid → _apply_per_video_cap → _normalize_chunk_shape →
+# _expand_with_neighbors. The expansion step (rag/expansion.py
+# expand_and_merge) builds its result spans with an explicit field list
+# that intentionally drops chunk_index — it's only used internally to
+# sort and group neighbors. source_type and lesson_url MUST appear so
+# the frontend CitationModal can route YouTube vs. Dynamous correctly
+# (issue #147); without them, Dynamous chunks render as "Video
+# unavailable" with no external link.
 _FAKE_CHUNKS = [
     {
         "chunk_id": "c1",
@@ -76,6 +85,8 @@ _FAKE_CHUNKS = [
         "video_id": "v1",
         "video_title": "How RAG Works",
         "video_url": "https://youtu.be/abc",
+        "source_type": "youtube",
+        "lesson_url": "",
         "start_seconds": 0.0,
         "end_seconds": 30.0,
         "snippet": "First",
